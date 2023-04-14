@@ -43,10 +43,29 @@ static kh_bool is_src_end(kh_lexer_run_context * ctx, kh_u32 offset) {
   return (ctx->isrc + offset) >= ctx->src_size;
 }
 
+/*
+ *  [14/04/2023]
+ *  acquire_entry does not allocate memory, memory is provided by
+ *  the caller and is expanded by responding to a KH_LEXER_RESPONSE_BUFFER_EXHAUSTED
+ *  therefore it should be guaranteed that the only reason acquire_entry would ever
+ *  return NULL is to request a buffer reallocation. When calling acquire_entry and receiving
+ *  a NULL simply return a KH_LEX_ABORT and the lexer will check the context and tell the caller
+ *  for more memory.
+ *
+ *  TL;DR:
+ *  > It's guaranteed that a NULL return is not a critical error and to return with KH_LEX_ABORT
+ *  upon receiving one.
+ *  > To not modify `ctx->status`
+ *  > Even if it says ABORT it will not shutdown the lexer, when ctx is set to signal a buffer exhaust the abort
+ *  is turned into the appropriate *_BUFFER_EXHAUSTED
+ *
+ */
 static kh_lexer_token_entry * acquire_entry(kh_lexer_run_context * ctx) {
   kh_sz new_index = ctx->itoken_buffer + sizeof(kh_lexer_run_context);
-  if (new_index >= ctx->token_buffer_size)
+  if (new_index >= ctx->token_buffer_size) {
+    ctx->status = KH_LEXER_STATUS_BUFFER_EXHAUSTED;
     return 0;
+  }
 
   kh_lexer_token_entry * new_entry = (kh_lexer_token_entry *)((kh_u8 *)ctx->token_buffer + ctx->itoken_buffer);
   ctx->itoken_buffer = new_index;
@@ -138,6 +157,25 @@ static kh_lex_resp lex_comments(kh_lexer_run_context * ctx) {
 }
 
 static kh_lex_resp lex_charsymbols(kh_lexer_run_context * ctx) {
+  const kh_u32 nchars  = sizeof(tok_charsyms) / sizeof(tok_charsyms[0]);
+  const kh_u32 ngroups = sizeof(tok_charsyms_pair) / sizeof(tok_charsyms_pair[0]);
+
+  kh_lexer_token_entry * entry = 0;
+  const kh_utf8 cch = ctx->src[ctx->isrc];
+  for (kh_u32 i = 0; i < nchars; ++i) {
+    if (tok_charsyms[i] != cch)
+      continue;
+    entry = acquire_entry(ctx);
+    if (!entry) {
+      return KH_LEX_ABORT;
+    }
+    return KH_LEX_MATCH;
+  }
+
+  return KH_LEX_PASS;
+}
+
+static kh_lex_resp lex_strings(kh_lexer_run_context * ctx) {
   return KH_LEX_PASS;
 }
 
@@ -158,6 +196,8 @@ typedef kh_lex_resp(*lexer_cb_t)(kh_lexer_run_context *);
 static const lexer_cb_t lexers[] = {
   lex_whitespace,
   lex_comments,
+  lex_charsymbols,
+  lex_strings,
   lex_keywords,
   lex_identifiers,
   lex_numbers,
@@ -167,8 +207,8 @@ static const lexer_cb_t lexers[] = {
 
 kh_lexer_response kh_lexer(kh_lexer_run_context * ctx) {
   const int nlexers = sizeof(lexers) / sizeof(void *);
-
   kh_lex_resp resp = KH_LEX_ABORT;
+
   while (!is_src_end(ctx, 0)) {
 
     for (int i = 0; i < nlexers; ++i) {
@@ -176,6 +216,8 @@ kh_lexer_response kh_lexer(kh_lexer_run_context * ctx) {
       if (resp == KH_LEX_PASS) {
         continue;
       } else if (resp == KH_LEX_ABORT) {
+        if (ctx->status == KH_LEXER_STATUS_BUFFER_EXHAUSTED) // [14/04/2023] Respond with a buffer exhaust instead if that's the status so we dont shutdown the lexer
+          return KH_LEXER_RESPONSE_BUFFER_EXHAUSTED;
         return KH_LEXER_RESPONSE_ERROR; // [10/04/2023] We dont set ctx->status as the lexer callbacks might've set it
       } else if (resp == KH_LEX_MATCH) {
         break;

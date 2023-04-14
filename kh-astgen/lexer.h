@@ -36,6 +36,7 @@ typedef enum _kh_lexer_status {
   KH_LEXER_STATUS_UNKERR,
   KH_LEXER_STATUS_INVALID_UTF8,
   KH_LEXER_STATUS_NO_LEX_MATCH,
+  KH_LEXER_STATUS_BUFFER_EXHAUSTED,
 } kh_lexer_status;
 
 typedef struct _kh_lexer_run_context {
