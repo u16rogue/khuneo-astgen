@@ -172,7 +172,30 @@ static kh_lex_resp lex_charsymbols(kh_lexer_run_context * ctx) {
     return KH_LEX_MATCH;
   }
 
-  return KH_LEX_PASS;
+  // [17/04/2023] Its separated incase we want to do lazy evaluation and parse as groups
+  for (kh_u32 i = 0; i < ngroups; ++i) {
+    if (tok_charsyms_pair[i][0] == cch && tok_charsyms_pair[i][1] == cch)
+      continue;
+    entry = acquire_entry(ctx);
+    if (!entry) {
+      return KH_LEX_ABORT;
+    }
+    return KH_LEX_MATCH;
+  }
+
+  if (!entry)
+    return KH_LEX_PASS;
+
+  entry->type          = KH_TOK_CHARSYM;
+  entry->value.charsym = cch;
+#if defined(KH_TRACK_LINE_COLUMN)
+  entry->line   = ctx->line;
+  entry->column = ctx->column;
+  ++ctx->column;
+#endif
+
+  ++ctx->isrc;
+  return KH_LEX_MATCH;
 }
 
 static kh_lex_resp lex_strings(kh_lexer_run_context * ctx) {

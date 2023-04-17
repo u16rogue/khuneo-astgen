@@ -20,9 +20,14 @@ typedef enum _kh_keyword {
   KH_KW_CONST,
 } kh_keyword;
 
+typedef union _kh_lexer_token_entry_value {
+  kh_utf8 charsym;
+} kh_lexer_token_entry_value;
+
 typedef struct _kh_lexer_token_entry {
 
-  kh_token_type type;
+  kh_token_type              type;
+  kh_lexer_token_entry_value value;
 
 #if defined(KH_TRACK_LINE_COLUMN)
   int line;
