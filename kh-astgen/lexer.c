@@ -199,7 +199,63 @@ static kh_lex_resp lex_charsymbols(kh_lexer_run_context * ctx) {
 }
 
 static kh_lex_resp lex_strings(kh_lexer_run_context * ctx) {
-  return KH_LEX_PASS;
+  kh_utf8 str_delim = '\0';
+  const kh_u32 nstrdelim = sizeof(tok_stringcont) / sizeof(tok_stringcont[0]);
+
+  for (kh_u32 i = 0; i < nstrdelim; ++i) {
+    if (tok_stringcont[i] == ctx->src[ctx->isrc]) {
+      str_delim = tok_stringcont[i];
+      break;
+    }
+  }
+
+  if (str_delim == '\0')
+    return KH_LEX_PASS;
+
+  kh_lexer_token_entry * entry = acquire_entry(ctx);
+  if (!entry)
+    return KH_LEX_ABORT;
+
+  kh_sz start_index = ctx->isrc;
+  ++ctx->isrc;
+  KH_HLP_ADD_COLUMN(1);
+
+  while (!is_src_end(ctx, 0)) {
+    kh_utf8 cc = ctx->src[ctx->isrc];
+    if (cc == str_delim && ctx->isrc != 1 && ctx->src[ctx->isrc - 1] != '\\') {
+      str_delim = '\0';
+      break;
+    }
+
+    if (lex_whitespace(ctx) == KH_LEX_MATCH)
+      continue;
+
+    kh_sz csz = kh_utf8_char_len(cc);
+    if (csz == -1) {
+      ctx->status = KH_LEXER_STATUS_INVALID_UTF8;
+      return KH_LEX_ABORT;
+    }
+
+    ctx->isrc += csz;
+    KH_HLP_ADD_COLUMN(1);
+  }
+
+  // [17/04/2023] We set str_delim back to \0 to signal the ending string delimeter was found, if the loop
+  // ended without this flag being set that means the string is malformed
+  if (str_delim != '\0') {
+    ctx->status = KH_LEXER_STATUS_INVALID_STRING_SYNTAX;
+    return KH_LEX_ABORT;
+  }
+
+  // Move from the matched str_delim
+  ++ctx->isrc;
+  KH_HLP_ADD_COLUMN(1);
+
+  entry->type = KH_TOK_STRING;
+  entry->value.string.index = start_index;
+  entry->value.string.size  = ctx->isrc - start_index;
+
+  return KH_LEX_MATCH;
 }
 
 static kh_lex_resp lex_keywords(kh_lexer_run_context * ctx) {

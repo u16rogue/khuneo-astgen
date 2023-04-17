@@ -22,6 +22,11 @@ typedef enum _kh_keyword {
 
 typedef union _kh_lexer_token_entry_value {
   kh_utf8 charsym;
+
+  struct {
+    kh_u32 index;
+    kh_u32 size;
+  } string;
 } kh_lexer_token_entry_value;
 
 typedef struct _kh_lexer_token_entry {
@@ -42,6 +47,8 @@ typedef enum _kh_lexer_status {
   KH_LEXER_STATUS_INVALID_UTF8,
   KH_LEXER_STATUS_NO_LEX_MATCH,
   KH_LEXER_STATUS_BUFFER_EXHAUSTED,
+  KH_LEXER_STATUS_SYNTAX_ERROR,
+  KH_LEXER_STATUS_INVALID_STRING_SYNTAX, // [17/04/2023] could really name this better
 } kh_lexer_status;
 
 typedef struct _kh_lexer_run_context {
