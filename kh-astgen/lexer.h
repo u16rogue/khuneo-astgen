@@ -12,16 +12,26 @@ typedef enum _kh_token_type {
 
 typedef enum _kh_keyword {
   KH_KW_INVALID,
-  KH_KW_NULL,
-  KH_KW_UNDEFINED,
+  KH_KW_DEF,
+  KH_KW_AS,
+  KH_KW_IMPORT,
+  KH_KW_EXPORT,
   KH_KW_IF,
   KH_KW_ELSE,
-  KH_KW_LET,
-  KH_KW_CONST,
+  KH_KW_ITER,
+  KH_KW_DEFER,
+  KH_KW_BREAK,
+  KH_KW_CONTINUE,
+  KH_KW_RETURN,
+  KH_KW_TRUE,
+  KH_KW_FALSE,
+  KH_KW_NIL,
+  KH_KW_UNDEFINED,
 } kh_keyword;
 
 typedef union _kh_lexer_token_entry_value {
   kh_utf8 charsym;
+  kh_keyword keyword;
 
   struct {
     kh_u32 index;

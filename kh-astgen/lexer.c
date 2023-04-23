@@ -16,6 +16,7 @@ static const kh_utf8 tok_charsyms[] = {
   '@',
   '!',
   ':',
+  '?'
 };
 
 static const kh_utf8 tok_charsyms_pair[][2] = {
@@ -29,6 +30,24 @@ static const kh_utf8 tok_stringcont[] = {
   '\'',
   '`',
   '"'
+};
+
+static const kh_utf8 * keywords[] = {
+  "def",
+  "as"
+  "import",
+  "export",
+  "if",
+  "else",
+  "iter",
+  "defer",
+  "break",
+  "continue",
+  "return",
+  "true",
+  "false",
+  "nil",
+  "undefined",
 };
 
 // ---------------------------------------------------------------------------------------------------- 
@@ -70,6 +89,32 @@ static kh_lexer_token_entry * acquire_entry(kh_lexer_run_context * ctx) {
   kh_lexer_token_entry * new_entry = (kh_lexer_token_entry *)((kh_u8 *)ctx->token_buffer + ctx->itoken_buffer);
   ctx->itoken_buffer = new_index;
   return new_entry;
+}
+
+// Validates identifier characters such as odentifiers, keyword, symbols, etc.
+static kh_bool is_valid_idtch(const kh_utf8 ch) {
+  return kh_utf8_is_alpha(ch) ||
+         kh_utf8_is_num(ch)   ||
+         (ch == '$')          ||
+         (ch == '_')            
+         ;
+}
+
+// NOTE: need fix for short matches (src: "undefined" matches with "undef")
+static kh_bool src_strcmp(kh_lexer_run_context * ctx, kh_sz idx, const kh_utf8 * str) {
+  kh_u32 i = 0;
+  while (!is_src_end(ctx, i)) {
+    if (ctx->src[ctx->isrc + i] != *str)
+      break;
+
+    ++i;
+    ++str;
+
+    if (*str == '\0')
+      return 1;
+  }
+
+  return 0;
 }
 
 // ---------------------------------------------------------------------------------------------------- 
@@ -222,7 +267,7 @@ static kh_lex_resp lex_strings(kh_lexer_run_context * ctx) {
 
   while (!is_src_end(ctx, 0)) {
     kh_utf8 cc = ctx->src[ctx->isrc];
-    if (cc == str_delim && ctx->isrc != 1 && ctx->src[ctx->isrc - 1] != '\\') {
+    if (cc == str_delim && ctx->isrc != 0 && ctx->src[ctx->isrc - 1] != '\\') {
       str_delim = '\0';
       break;
     }
@@ -259,6 +304,36 @@ static kh_lex_resp lex_strings(kh_lexer_run_context * ctx) {
 }
 
 static kh_lex_resp lex_keywords(kh_lexer_run_context * ctx) {
+  const kh_u32 nkw = sizeof(keywords) / sizeof(keywords[0]);
+
+  kh_u32 cmp_offset = 0;
+  for (kh_u32 i = 0; i < nkw; ++i) {
+    const kh_utf8 * ckw = keywords[i];
+    cmp_offset = 0;
+
+    while (!is_src_end(ctx, cmp_offset) && *ckw) {
+      if (ctx->src[ctx->isrc + cmp_offset] != *ckw)
+        break;
+
+      ++ckw;
+      ++cmp_offset;
+    }
+
+    if (*ckw == '\0' && !is_valid_idtch(ctx->src[ctx->isrc + cmp_offset])) { // The current cmp_offset should be invalid to properly denote a match with ckw's null terminator
+      kh_lexer_token_entry * entry = acquire_entry(ctx);
+      if (!entry)
+        return KH_LEX_ABORT;
+
+      entry->type          = KH_TOK_KEYWORD;
+      entry->value.keyword = i + 1; // [23/04/2023] The +1 is because 0 in kh_keyword is a KW_KW_INVALID to indicate a null
+      
+      ctx->isrc += cmp_offset;
+      KH_HLP_ADD_COLUMN(cmp_offset);
+
+      return KH_LEX_MATCH;
+    }
+  }
+
   return KH_LEX_PASS;
 }
 
