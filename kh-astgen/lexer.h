@@ -4,7 +4,7 @@
 
 typedef enum _kh_token_type {
   KH_TOK_INVALID,
-  KH_TOK_IDENT,
+  KH_TOK_IDENTIFIER,
   KH_TOK_KEYWORD,
   KH_TOK_STRING,
   KH_TOK_CHARSYM,

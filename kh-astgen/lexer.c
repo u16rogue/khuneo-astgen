@@ -338,7 +338,27 @@ static kh_lex_resp lex_keywords(kh_lexer_run_context * ctx) {
 }
 
 static kh_lex_resp lex_identifiers(kh_lexer_run_context * ctx) {
-  return KH_LEX_PASS;
+  const kh_utf8 cch = ctx->src[ctx->isrc];
+  if (!kh_utf8_is_alpha(cch) && cch != '_' && cch != '$')
+    return KH_LEX_PASS;
+
+  kh_lexer_token_entry * entry = acquire_entry(ctx);
+  if (!entry)
+    return KH_LEX_ABORT;
+
+  kh_sz start = ctx->isrc;
+
+  do {
+    kh_sz csz = kh_utf8_char_len(ctx->src[ctx->isrc]);
+    ctx->isrc += csz;
+    KH_HLP_ADD_COLUMN(1);
+  } while(!is_src_end(ctx, 0) && is_valid_idtch(ctx->src[ctx->isrc]));
+
+  entry->type = KH_TOK_IDENTIFIER;
+  entry->value.string.index = start;
+  entry->value.string.size  = ctx->isrc - start;
+
+  return KH_LEX_MATCH;
 }
 
 static kh_lex_resp lex_numbers(kh_lexer_run_context * ctx) {
