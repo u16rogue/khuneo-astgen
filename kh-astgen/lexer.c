@@ -189,7 +189,7 @@ static kh_lex_resp lex_comments(kh_lexer_run_context * ctx) {
     }
 
     kh_sz char_sz = kh_utf8_char_len(ctx->src[ctx->isrc]);
-    if (char_sz == -1) {
+    if (char_sz == KH_U8_INVALID) {
       ctx->status = KH_LEXER_STATUS_INVALID_UTF8;
       return KH_LEX_ABORT;
     }
@@ -219,7 +219,7 @@ static kh_lex_resp lex_charsymbols(kh_lexer_run_context * ctx) {
 
   // [17/04/2023] Its separated incase we want to do lazy evaluation and parse as groups
   for (kh_u32 i = 0; i < ngroups; ++i) {
-    if (tok_charsyms_pair[i][0] == cch && tok_charsyms_pair[i][1] == cch)
+    if (tok_charsyms_pair[i][0] != cch && tok_charsyms_pair[i][1] != cch)
       continue;
     entry = acquire_entry(ctx);
     if (!entry) {
@@ -276,7 +276,7 @@ static kh_lex_resp lex_strings(kh_lexer_run_context * ctx) {
       continue;
 
     kh_sz csz = kh_utf8_char_len(cc);
-    if (csz == -1) {
+    if (csz == KH_U8_INVALID) {
       ctx->status = KH_LEXER_STATUS_INVALID_UTF8;
       return KH_LEX_ABORT;
     }
@@ -362,6 +362,26 @@ static kh_lex_resp lex_identifiers(kh_lexer_run_context * ctx) {
 }
 
 static kh_lex_resp lex_numbers(kh_lexer_run_context * ctx) {
+  const kh_utf8 cch = ctx->src[ctx->isrc];
+  // const kh_bool is_negative = cch != '-'; [23/04/2023] we should have negative values at the parser level so we dont have to deal with contexts at lexer level
+  kh_u8 h_val = KH_U8_INVALID; // Acts as first value read and indicator if we're parsing as a hex value
+  const kh_utf8 * csp = &ctx->src[ctx->isrc];
+  if (!is_src_end(ctx, 2)              &&
+       csp[0] == '0'                   &&
+      (csp[1] == 'x' || csp[1] == 'X')
+  ) {
+    c_val = kh_utf8_hexchar_to_nibble(csp[2]);
+  }
+
+  if (c_val != KH_U8_INVALID && !kh_utf8_is_hex(cch))
+    return KH_LEX_PASS;
+
+  kh_u64 value = 0;
+
+  while () {
+  }
+
+
   return KH_LEX_PASS;
 }
 
