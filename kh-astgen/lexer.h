@@ -129,14 +129,16 @@ kh_token_type kh_lexer_token_entry_type_get(kh_lexer_token_entry * c);
 kh_lexer_token_entry_value * kh_lexer_token_value_get(kh_lexer_token_entry * c);
 
 /*
- *  Obtains the line field of a token entry. Returns 0xFFFFFFFF
- *  if `Line` is not being tracked
+ *  Obtains the line field of a token entry. Returns 0
+ *  if `Line` is not being tracked.
+ *  (As it should be impossible to have line 0)
  */
 kh_u32 kh_lexer_token_entry_line_get(kh_lexer_token_entry * c);
 
 /*
- *  Obtains the column field of a token entry. Returns 0xFFFFFFFF
+ *  Obtains the column field of a token entry. Returns 0
  *  if `Line` is not being tracked
+ *  (As it should be impossible to have line 0)
  */
 kh_u32 kh_lexer_token_entry_column_get(kh_lexer_token_entry * c);
 

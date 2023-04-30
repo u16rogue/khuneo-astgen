@@ -265,6 +265,11 @@ static kh_lex_resp lex_strings(kh_lexer_context * ctx) {
   if (!entry)
     return KH_LEX_ABORT;
 
+#if defined(KH_TRACK_LINE_COLUMN)
+  entry->line   = ctx->line;
+  entry->column = ctx->column;
+#endif
+
   kh_sz start_index = ctx->isrc;
   ++ctx->isrc;
   KH_HLP_ADD_COLUMN(1);
@@ -330,7 +335,10 @@ static kh_lex_resp lex_keywords(kh_lexer_context * ctx) {
 
       entry->type          = KH_TOK_KEYWORD;
       entry->value.keyword = i + 1; // [23/04/2023] The +1 is because 0 in kh_keyword is a KW_KW_INVALID to indicate a null
-      
+#if defined(KH_TRACK_LINE_COLUMN)
+      entry->line   = ctx->line;
+      entry->column = ctx->column;
+#endif
       ctx->isrc += cmp_offset;
       KH_HLP_ADD_COLUMN(cmp_offset);
 
@@ -349,6 +357,11 @@ static kh_lex_resp lex_identifiers(kh_lexer_context * ctx) {
   kh_lexer_token_entry * entry = acquire_entry(ctx);
   if (!entry)
     return KH_LEX_ABORT;
+
+#if defined(KH_TRACK_LINE_COLUMN)
+  entry->line   = ctx->line;
+  entry->column = ctx->column;
+#endif
 
   kh_sz start = ctx->isrc;
 
@@ -382,6 +395,11 @@ static kh_lex_resp lex_numbers(kh_lexer_context * ctx) {
   kh_lexer_token_entry * entry = acquire_entry(ctx);
   if (!entry)
     return KH_LEX_ABORT;
+
+#if defined(KH_TRACK_LINE_COLUMN)
+  entry->line   = ctx->line;
+  entry->column = ctx->column;
+#endif
 
   kh_f64 floating_offset = 0.0; // [30/04/2023] run benchmarks whether using a 0.0 check or a floating flag would be better
   kh_u64 value           = 0;
@@ -510,7 +528,7 @@ kh_u32 kh_lexer_token_entry_line_get(kh_lexer_token_entry * c) {
 #if defined(KH_TRACK_LINE_COLUMN)
   return c->line;
 #else
-  return 0xFFFFFFFF;
+  return 0;
 #endif
 }
 
@@ -518,7 +536,7 @@ kh_u32 kh_lexer_token_entry_column_get(kh_lexer_token_entry * c) {
 #if defined(KH_TRACK_LINE_COLUMN)
   return c->column;
 #else
-  return 0xFFFFFFFF;
+  return 0;
 #endif
 }
 
