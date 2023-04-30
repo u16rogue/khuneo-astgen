@@ -33,7 +33,7 @@ static const kh_utf8 tok_charsyms_pair[][2] = {
 static const kh_utf8 tok_stringcont[] = {
   '\'',
   '`',
-  '"'
+  '"',
 };
 
 static const kh_utf8 * keywords[] = {
@@ -366,7 +366,6 @@ static kh_lex_resp lex_identifiers(kh_lexer_context * ctx) {
 }
 
 static kh_lex_resp lex_numbers(kh_lexer_context * ctx) {
-  const kh_utf8 cch = ctx->src[ctx->isrc];
   // const kh_bool is_negative = cch != '-'; [23/04/2023] we should have negative values at the parser level so we dont have to deal with contexts at lexer level
   kh_u8 h_val = KH_U8_INVALID; // Acts as first value read and indicator if we're parsing as a hex value
   const kh_utf8 * csp = &ctx->src[ctx->isrc];
@@ -377,20 +376,31 @@ static kh_lex_resp lex_numbers(kh_lexer_context * ctx) {
     h_val = kh_utf8_hexchar_to_nibble(csp[2]);
   }
 
-  if (h_val == KH_U8_INVALID && !kh_utf8_is_hex(cch))
+  if (h_val == KH_U8_INVALID && !kh_utf8_is_hex(csp[0]))
     return KH_LEX_PASS;
 
   kh_lexer_token_entry * entry = acquire_entry(ctx);
   if (!entry)
     return KH_LEX_ABORT;
 
-  kh_u64 value = 0;
+  kh_f64 floating_offset = 0.0; // [30/04/2023] run benchmarks whether using a 0.0 check or a floating flag would be better
+  kh_u64 value           = 0;
 
   if (h_val == KH_U8_INVALID) { // Base 10 oarsing
     while (!is_src_end(ctx, 0)) {
+      const kh_utf8 cc = ctx->src[ctx->isrc];
+
+      if (floating_offset == 0.0 && cc == '.') {
+        floating_offset = 0.10;
+        ++ctx->isrc;
+        continue;
+      }
+
       const kh_u8 val = kh_utf8_char_to_num(ctx->src[ctx->isrc]);
       if (val == KH_U8_INVALID)
         break;
+      if (floating_offset != 0.0)
+        floating_offset *= 0.10;
       value *= 10;
       value += val;
       ++ctx->isrc;
@@ -412,8 +422,14 @@ static kh_lex_resp lex_numbers(kh_lexer_context * ctx) {
     }
   }
 
-  entry->type      = KH_TOK_U64;
-  entry->value.u64 = value;
+  if (floating_offset == 0.0) {
+    entry->type      = KH_TOK_F64;
+    entry->value.f64 = value * floating_offset;
+  } else {
+    entry->type      = KH_TOK_U64;
+    entry->value.u64 = value;
+  }
+  
 
   return KH_LEX_MATCH;
 }
