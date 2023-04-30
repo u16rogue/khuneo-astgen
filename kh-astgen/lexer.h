@@ -8,6 +8,7 @@ typedef enum _kh_token_type {
   KH_TOK_KEYWORD,
   KH_TOK_STRING,
   KH_TOK_CHARSYM,
+  KH_TOK_U64,
 } kh_token_type;
 
 typedef enum _kh_keyword {
@@ -30,8 +31,9 @@ typedef enum _kh_keyword {
 } kh_keyword;
 
 typedef union _kh_lexer_token_entry_value {
-  kh_utf8 charsym;
+  kh_utf8    charsym;
   kh_keyword keyword;
+  kh_u64     u64;
 
   struct {
     kh_u32 index;
@@ -95,4 +97,48 @@ typedef enum _kh_lexer_response {
 
 } kh_lexer_response;
 
+/*
+ *  Runs the lexer with a given context.
+ */
 kh_lexer_response kh_lexer(kh_lexer_run_context * ctx);
+
+/*
+ *  Obtains the first token entry in a context.
+ *  `c` is an out pointer.
+ *  Returns true if there is an entry and was placed on `c` otherwise false
+ */
+kh_bool kh_lexer_token_entry_first(kh_lexer_run_context * ctx, kh_lexer_token_entry ** c);
+
+/*
+ *  Obtains the next token based off the current `c`
+ *  `c` is an in and out pointer
+ *  Returns true if a next entry is available and has been placed to `c` otherwise false
+ */
+kh_bool kh_lexer_token_entry_next(kh_lexer_run_context * ctx, kh_lexer_token_entry ** c);
+
+/*
+ *  Obtains the type field of a token entry
+ */
+kh_token_type kh_lexer_token_entry_type_get(kh_lexer_token_entry * c);
+
+/*
+ *  Obtains the value field of a token entry
+ */
+kh_lexer_token_entry_value * kh_lexer_token_value_get(kh_lexer_token_entry * c);
+
+/*
+ *  Obtains the line field of a token entry. Returns 0xFFFFFFFF
+ *  if `Line` is not being tracked
+ */
+kh_u32 kh_lexer_token_entry_line_get(kh_lexer_token_entry * c);
+
+/*
+ *  Obtains the column field of a token entry. Returns 0xFFFFFFFF
+ *  if `Line` is not being tracked
+ */
+kh_u32 kh_lexer_token_entry_column_get(kh_lexer_token_entry * c);
+
+/*
+ *  Reports the size of the structure `kh_lexer_token_entry`
+ */
+const kh_sz kh_lexer_token_entry_size();

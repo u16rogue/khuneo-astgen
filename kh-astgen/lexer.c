@@ -4,6 +4,7 @@
 // ---------------------------------------------------------------------------------------------------- 
 
 static const kh_utf8 tok_charsyms[] = {
+  ';',
   '+',
   '-',
   '*',
@@ -34,7 +35,7 @@ static const kh_utf8 tok_stringcont[] = {
 
 static const kh_utf8 * keywords[] = {
   "def",
-  "as"
+  "as",
   "import",
   "export",
   "if",
@@ -80,7 +81,7 @@ static kh_bool is_src_end(kh_lexer_run_context * ctx, kh_u32 offset) {
  *
  */
 static kh_lexer_token_entry * acquire_entry(kh_lexer_run_context * ctx) {
-  kh_sz new_index = ctx->itoken_buffer + sizeof(kh_lexer_run_context);
+  kh_sz new_index = ctx->itoken_buffer + sizeof(kh_lexer_token_entry);
   if (new_index >= ctx->token_buffer_size) {
     ctx->status = KH_LEXER_STATUS_BUFFER_EXHAUSTED;
     return 0;
@@ -205,31 +206,31 @@ static kh_lex_resp lex_charsymbols(kh_lexer_run_context * ctx) {
   const kh_u32 nchars  = sizeof(tok_charsyms) / sizeof(tok_charsyms[0]);
   const kh_u32 ngroups = sizeof(tok_charsyms_pair) / sizeof(tok_charsyms_pair[0]);
 
-  kh_lexer_token_entry * entry = 0;
   const kh_utf8 cch = ctx->src[ctx->isrc];
-  for (kh_u32 i = 0; i < nchars; ++i) {
-    if (tok_charsyms[i] != cch)
+
+  kh_u32 ic = 0;
+  for (; ic < nchars; ++ic) {
+    if (tok_charsyms[ic] != cch)
       continue;
-    entry = acquire_entry(ctx);
-    if (!entry) {
-      return KH_LEX_ABORT;
-    }
-    return KH_LEX_MATCH;
+    break; 
   }
 
   // [17/04/2023] Its separated incase we want to do lazy evaluation and parse as groups
-  for (kh_u32 i = 0; i < ngroups; ++i) {
-    if (tok_charsyms_pair[i][0] != cch && tok_charsyms_pair[i][1] != cch)
-      continue;
-    entry = acquire_entry(ctx);
-    if (!entry) {
-      return KH_LEX_ABORT;
+  kh_u32 ig = 0;
+  if (ic == nchars) {
+    for (; ig < ngroups; ++ig) {
+      if (tok_charsyms_pair[ig][0] != cch && tok_charsyms_pair[ig][1] != cch)
+        continue;
+      break;
     }
-    return KH_LEX_MATCH;
   }
 
-  if (!entry)
+  if (ic == nchars && ig == ngroups)
     return KH_LEX_PASS;
+
+  kh_lexer_token_entry * entry = acquire_entry(ctx);
+  if (!entry)
+    return KH_LEX_ABORT;
 
   entry->type          = KH_TOK_CHARSYM;
   entry->value.charsym = cch;
@@ -370,19 +371,48 @@ static kh_lex_resp lex_numbers(kh_lexer_run_context * ctx) {
        csp[0] == '0'                   &&
       (csp[1] == 'x' || csp[1] == 'X')
   ) {
-    c_val = kh_utf8_hexchar_to_nibble(csp[2]);
+    h_val = kh_utf8_hexchar_to_nibble(csp[2]);
   }
 
-  if (c_val != KH_U8_INVALID && !kh_utf8_is_hex(cch))
+  if (h_val != KH_U8_INVALID && !kh_utf8_is_hex(cch))
     return KH_LEX_PASS;
+
+  kh_lexer_token_entry * entry = acquire_entry(ctx);
+  if (!entry)
+    return KH_LEX_ABORT;
 
   kh_u64 value = 0;
 
-  while () {
+  if (h_val == KH_U8_INVALID) { // Base 10 oarsing
+    while (!is_src_end(ctx, 0)) {
+      const kh_u8 val = kh_utf8_char_to_num(ctx->src[ctx->isrc]);
+      if (val == KH_U8_INVALID)
+        break;
+      value *= 10;
+      value += val;
+      ++ctx->isrc;
+      KH_HLP_ADD_COLUMN(1);
+    }
+  } else { // Base 16 parsing
+    value = h_val;
+    ctx->isrc += 3; // len('0x*')
+    KH_HLP_ADD_COLUMN(3);
+    while (!is_src_end(ctx, 0)) {
+      const kh_u8 val = kh_utf8_hexchar_to_nibble(ctx->src[ctx->isrc]);
+      if (val == KH_U8_INVALID)
+        break;
+
+      value <<= 4;
+      value |= val;
+      ++ctx->isrc;
+      KH_HLP_ADD_COLUMN(1);
+    }
   }
 
+  entry->type      = KH_TOK_U64;
+  entry->value.u64 = value;
 
-  return KH_LEX_PASS;
+  return KH_LEX_MATCH;
 }
 
 typedef kh_lex_resp(*lexer_cb_t)(kh_lexer_run_context *);
@@ -417,8 +447,10 @@ kh_lexer_response kh_lexer(kh_lexer_run_context * ctx) {
         break;
       } else {
         // [10/04/2023] TODO: maybe throw an error? this should never be reachable
+        return KH_LEXER_RESPONSE_ERROR;
       }
       // [10/04/2023] This too should not reachable
+      return KH_LEXER_RESPONSE_ERROR;
     }
 
     // [10/04/2023] Abort if its still a pass which indicates no lexer matches
@@ -430,6 +462,49 @@ kh_lexer_response kh_lexer(kh_lexer_run_context * ctx) {
     // [10/04/2023] Under the assumption that the state is OK and we had a match
   }
   return KH_LEXER_RESPONSE_OK;
+}
+
+kh_bool kh_lexer_token_entry_first(kh_lexer_run_context * ctx, kh_lexer_token_entry ** c) {
+  if (ctx->itoken_buffer < sizeof(kh_lexer_token_entry))
+    return 0;
+  *c = &ctx->token_buffer[0];
+  return 1;
+}
+
+kh_bool kh_lexer_token_entry_next(kh_lexer_run_context * ctx, kh_lexer_token_entry ** c) {
+  kh_sz offs = ((kh_sz)*c) - ((kh_sz)ctx->token_buffer);
+  if (offs + sizeof(kh_lexer_token_entry) >= ctx->itoken_buffer)
+    return 0;
+  ++(*c);
+  return 1;
+}
+
+kh_token_type kh_lexer_token_entry_type_get(kh_lexer_token_entry * c) {
+  return c->type;
+}
+
+kh_lexer_token_entry_value * kh_lexer_token_value_get(kh_lexer_token_entry * c) {
+  return &c->value;
+}
+
+kh_u32 kh_lexer_token_entry_line_get(kh_lexer_token_entry * c) {
+#if defined(KH_TRACK_LINE_COLUMN)
+  return c->line;
+#else
+  return 0xFFFFFFFF;
+#endif
+}
+
+kh_u32 kh_lexer_token_entry_column_get(kh_lexer_token_entry * c) {
+#if defined(KH_TRACK_LINE_COLUMN)
+  return c->column;
+#else
+  return 0xFFFFFFFF;
+#endif
+}
+
+const kh_sz kh_lexer_token_entry_size() {
+  return sizeof(kh_lexer_token_entry);
 }
 
 #undef KH_HLP_ADD_COLUMN
