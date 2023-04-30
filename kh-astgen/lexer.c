@@ -3,8 +3,10 @@
 
 // ---------------------------------------------------------------------------------------------------- 
 
+// [30/04/202]TODO:sort by frequently used
 static const kh_utf8 tok_charsyms[] = {
   ';',
+  '.',
   '+',
   '-',
   '*',
@@ -17,7 +19,8 @@ static const kh_utf8 tok_charsyms[] = {
   '@',
   '!',
   ':',
-  '?'
+  '?',
+  ',',
 };
 
 static const kh_utf8 tok_charsyms_pair[][2] = {
@@ -59,7 +62,7 @@ static const kh_utf8 * keywords[] = {
   #define KH_HLP_ADD_COLUMN(x)
 #endif
 
-static kh_bool is_src_end(kh_lexer_run_context * ctx, kh_u32 offset) {
+static kh_bool is_src_end(kh_lexer_context * ctx, kh_u32 offset) {
   return (ctx->isrc + offset) >= ctx->src_size;
 }
 
@@ -80,7 +83,7 @@ static kh_bool is_src_end(kh_lexer_run_context * ctx, kh_u32 offset) {
  *  is turned into the appropriate *_BUFFER_EXHAUSTED
  *
  */
-static kh_lexer_token_entry * acquire_entry(kh_lexer_run_context * ctx) {
+static kh_lexer_token_entry * acquire_entry(kh_lexer_context * ctx) {
   kh_sz new_index = ctx->itoken_buffer + sizeof(kh_lexer_token_entry);
   if (new_index >= ctx->token_buffer_size) {
     ctx->status = KH_LEXER_STATUS_BUFFER_EXHAUSTED;
@@ -102,7 +105,7 @@ static kh_bool is_valid_idtch(const kh_utf8 ch) {
 }
 
 // NOTE: need fix for short matches (src: "undefined" matches with "undef")
-static kh_bool src_strcmp(kh_lexer_run_context * ctx, kh_sz idx, const kh_utf8 * str) {
+static kh_bool src_strcmp(kh_lexer_context * ctx, kh_sz idx, const kh_utf8 * str) {
   kh_u32 i = 0;
   while (!is_src_end(ctx, i)) {
     if (ctx->src[ctx->isrc + i] != *str)
@@ -126,7 +129,7 @@ typedef enum _kh_lex_resp {
   KH_LEX_ABORT, // [10/04/2023] When returning an abort status it's recommended to set ctx->status to let the caller know what happened. or dont. (you can use KH_LEXER_STATUS_UNKERR)
 } kh_lex_resp;
 
-static kh_lex_resp lex_whitespace(kh_lexer_run_context * ctx) {
+static kh_lex_resp lex_whitespace(kh_lexer_context * ctx) {
   switch (ctx->src[ctx->isrc]) {
     case ' ':
       KH_HLP_ADD_COLUMN(1);
@@ -158,7 +161,7 @@ static kh_lex_resp lex_whitespace(kh_lexer_run_context * ctx) {
   return KH_LEX_MATCH;
 }
 
-static kh_lex_resp lex_comments(kh_lexer_run_context * ctx) {
+static kh_lex_resp lex_comments(kh_lexer_context * ctx) {
   if (ctx->src[ctx->isrc] != '/' || is_src_end(ctx, 1))
     return KH_LEX_PASS;
 
@@ -202,7 +205,7 @@ static kh_lex_resp lex_comments(kh_lexer_run_context * ctx) {
   return KH_LEX_MATCH;
 }
 
-static kh_lex_resp lex_charsymbols(kh_lexer_run_context * ctx) {
+static kh_lex_resp lex_charsymbols(kh_lexer_context * ctx) {
   const kh_u32 nchars  = sizeof(tok_charsyms) / sizeof(tok_charsyms[0]);
   const kh_u32 ngroups = sizeof(tok_charsyms_pair) / sizeof(tok_charsyms_pair[0]);
 
@@ -244,7 +247,7 @@ static kh_lex_resp lex_charsymbols(kh_lexer_run_context * ctx) {
   return KH_LEX_MATCH;
 }
 
-static kh_lex_resp lex_strings(kh_lexer_run_context * ctx) {
+static kh_lex_resp lex_strings(kh_lexer_context * ctx) {
   kh_utf8 str_delim = '\0';
   const kh_u32 nstrdelim = sizeof(tok_stringcont) / sizeof(tok_stringcont[0]);
 
@@ -304,7 +307,7 @@ static kh_lex_resp lex_strings(kh_lexer_run_context * ctx) {
   return KH_LEX_MATCH;
 }
 
-static kh_lex_resp lex_keywords(kh_lexer_run_context * ctx) {
+static kh_lex_resp lex_keywords(kh_lexer_context * ctx) {
   const kh_u32 nkw = sizeof(keywords) / sizeof(keywords[0]);
 
   kh_u32 cmp_offset = 0;
@@ -338,7 +341,7 @@ static kh_lex_resp lex_keywords(kh_lexer_run_context * ctx) {
   return KH_LEX_PASS;
 }
 
-static kh_lex_resp lex_identifiers(kh_lexer_run_context * ctx) {
+static kh_lex_resp lex_identifiers(kh_lexer_context * ctx) {
   const kh_utf8 cch = ctx->src[ctx->isrc];
   if (!kh_utf8_is_alpha(cch) && cch != '_' && cch != '$')
     return KH_LEX_PASS;
@@ -362,7 +365,7 @@ static kh_lex_resp lex_identifiers(kh_lexer_run_context * ctx) {
   return KH_LEX_MATCH;
 }
 
-static kh_lex_resp lex_numbers(kh_lexer_run_context * ctx) {
+static kh_lex_resp lex_numbers(kh_lexer_context * ctx) {
   const kh_utf8 cch = ctx->src[ctx->isrc];
   // const kh_bool is_negative = cch != '-'; [23/04/2023] we should have negative values at the parser level so we dont have to deal with contexts at lexer level
   kh_u8 h_val = KH_U8_INVALID; // Acts as first value read and indicator if we're parsing as a hex value
@@ -374,7 +377,7 @@ static kh_lex_resp lex_numbers(kh_lexer_run_context * ctx) {
     h_val = kh_utf8_hexchar_to_nibble(csp[2]);
   }
 
-  if (h_val != KH_U8_INVALID && !kh_utf8_is_hex(cch))
+  if (h_val == KH_U8_INVALID && !kh_utf8_is_hex(cch))
     return KH_LEX_PASS;
 
   kh_lexer_token_entry * entry = acquire_entry(ctx);
@@ -415,7 +418,7 @@ static kh_lex_resp lex_numbers(kh_lexer_run_context * ctx) {
   return KH_LEX_MATCH;
 }
 
-typedef kh_lex_resp(*lexer_cb_t)(kh_lexer_run_context *);
+typedef kh_lex_resp(*lexer_cb_t)(kh_lexer_context *);
 
 static const lexer_cb_t lexers[] = {
   lex_whitespace,
@@ -429,7 +432,7 @@ static const lexer_cb_t lexers[] = {
 
 // ---------------------------------------------------------------------------------------------------- 
 
-kh_lexer_response kh_lexer(kh_lexer_run_context * ctx) {
+kh_lexer_response kh_lexer(kh_lexer_context * ctx) {
   const int nlexers = sizeof(lexers) / sizeof(void *);
   kh_lex_resp resp = KH_LEX_ABORT;
 
@@ -464,14 +467,14 @@ kh_lexer_response kh_lexer(kh_lexer_run_context * ctx) {
   return KH_LEXER_RESPONSE_OK;
 }
 
-kh_bool kh_lexer_token_entry_first(kh_lexer_run_context * ctx, kh_lexer_token_entry ** c) {
+kh_bool kh_lexer_token_entry_first(kh_lexer_context * ctx, kh_lexer_token_entry ** c) {
   if (ctx->itoken_buffer < sizeof(kh_lexer_token_entry))
     return 0;
   *c = &ctx->token_buffer[0];
   return 1;
 }
 
-kh_bool kh_lexer_token_entry_next(kh_lexer_run_context * ctx, kh_lexer_token_entry ** c) {
+kh_bool kh_lexer_token_entry_next(kh_lexer_context * ctx, kh_lexer_token_entry ** c) {
   kh_sz offs = ((kh_sz)*c) - ((kh_sz)ctx->token_buffer);
   if (offs + sizeof(kh_lexer_token_entry) >= ctx->itoken_buffer)
     return 0;

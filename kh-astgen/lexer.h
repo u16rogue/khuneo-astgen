@@ -63,7 +63,7 @@ typedef enum _kh_lexer_status {
   KH_LEXER_STATUS_INVALID_STRING_SYNTAX, // [17/04/2023] could really name this better
 } kh_lexer_status;
 
-typedef struct _kh_lexer_run_context {
+typedef struct _kh_lexer_context {
 
   kh_lexer_status status;
 
@@ -80,7 +80,7 @@ typedef struct _kh_lexer_run_context {
   kh_u32 column;
 #endif
 
-} kh_lexer_run_context;
+} kh_lexer_context;
 
 typedef enum _kh_lexer_response {
   // Lexer finished parsing the tokens
@@ -100,21 +100,21 @@ typedef enum _kh_lexer_response {
 /*
  *  Runs the lexer with a given context.
  */
-kh_lexer_response kh_lexer(kh_lexer_run_context * ctx);
+kh_lexer_response kh_lexer(kh_lexer_context * ctx);
 
 /*
  *  Obtains the first token entry in a context.
  *  `c` is an out pointer.
  *  Returns true if there is an entry and was placed on `c` otherwise false
  */
-kh_bool kh_lexer_token_entry_first(kh_lexer_run_context * ctx, kh_lexer_token_entry ** c);
+kh_bool kh_lexer_token_entry_first(kh_lexer_context * ctx, kh_lexer_token_entry ** c);
 
 /*
  *  Obtains the next token based off the current `c`
  *  `c` is an in and out pointer
  *  Returns true if a next entry is available and has been placed to `c` otherwise false
  */
-kh_bool kh_lexer_token_entry_next(kh_lexer_run_context * ctx, kh_lexer_token_entry ** c);
+kh_bool kh_lexer_token_entry_next(kh_lexer_context * ctx, kh_lexer_token_entry ** c);
 
 /*
  *  Obtains the type field of a token entry
