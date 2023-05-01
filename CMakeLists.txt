@@ -9,8 +9,8 @@ project(kh_astgen)
 add_library(
   ${PROJECT_NAME}
   STATIC
-  "kh-astgen/lexer.h"
-  "kh-astgen/lexer.c"
+  "include/kh-astgen/lexer.h"
+  "src/lexer.c"
 )
 
 set_target_properties(
@@ -22,7 +22,7 @@ set_target_properties(
 target_include_directories(
   ${PROJECT_NAME}
   PUBLIC
-  "${CMAKE_CURRENT_SOURCE_DIR}"
+  "include/"
 )
 
 target_link_libraries(
