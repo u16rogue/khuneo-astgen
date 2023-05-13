@@ -5,13 +5,15 @@
 typedef enum _kh_token_type {
   KH_TOK_INVALID,
   KH_TOK_IDENTIFIER,
-  KH_TOK_KEYWORD,
+  // KH_TOK_KEYWORD,
   KH_TOK_STRING,
   KH_TOK_CHARSYM,
   KH_TOK_U64,
   KH_TOK_F64,
 } kh_token_type;
 
+// [13/05/2023] Removed keyword parsing and instead added as an identifier for the parser to process
+#if 0
 typedef enum _kh_keyword {
   KH_KW_INVALID,
   KH_KW_DEF,
@@ -30,10 +32,10 @@ typedef enum _kh_keyword {
   KH_KW_NIL,
   KH_KW_UNDEFINED,
 } kh_keyword;
+#endif
 
 typedef union _kh_lexer_token_entry_value {
   kh_utf8    charsym;
-  kh_keyword keyword;
   kh_u64     u64;
   kh_f64     f64;
 
@@ -41,6 +43,8 @@ typedef union _kh_lexer_token_entry_value {
     kh_u32 index;
     kh_u32 size;
   } string;
+
+  // kh_keyword keyword;
 } kh_lexer_token_entry_value;
 
 typedef struct _kh_lexer_token_entry {

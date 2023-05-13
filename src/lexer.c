@@ -36,6 +36,7 @@ static const kh_utf8 tok_stringcont[] = {
   '"',
 };
 
+#if 0
 static const kh_utf8 * keywords[] = {
   "def",
   "as",
@@ -53,6 +54,7 @@ static const kh_utf8 * keywords[] = {
   "nil",
   "undefined",
 };
+#endif
 
 // ---------------------------------------------------------------------------------------------------- 
 
@@ -312,6 +314,7 @@ static kh_lex_resp lex_strings(kh_lexer_context * ctx) {
   return KH_LEX_MATCH;
 }
 
+#if 0
 static kh_lex_resp lex_keywords(kh_lexer_context * ctx) {
   const kh_u32 nkw = sizeof(keywords) / sizeof(keywords[0]);
 
@@ -348,6 +351,7 @@ static kh_lex_resp lex_keywords(kh_lexer_context * ctx) {
 
   return KH_LEX_PASS;
 }
+#endif
 
 static kh_lex_resp lex_identifiers(kh_lexer_context * ctx) {
   const kh_utf8 cch = ctx->src[ctx->isrc];
@@ -459,7 +463,7 @@ static const lexer_cb_t lexers[] = {
   lex_comments,
   lex_charsymbols,
   lex_strings,
-  lex_keywords,
+  // lex_keywords,
   lex_identifiers,
   lex_numbers,
 };
