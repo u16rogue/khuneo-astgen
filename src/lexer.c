@@ -444,9 +444,9 @@ static kh_lex_resp lex_numbers(kh_lexer_context * ctx) {
     }
   }
 
-  if (floating_offset == 0.0) {
+  if (floating_offset != 0.0) {
     entry->type      = KH_TOK_F64;
-    entry->value.f64 = value * floating_offset;
+    entry->value.f64 = value * floating_offset * 10.0; // [17/05/2023] lol :))
   } else {
     entry->type      = KH_TOK_U64;
     entry->value.u64 = value;

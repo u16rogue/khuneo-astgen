@@ -53,8 +53,8 @@ typedef struct _kh_lexer_token_entry {
   kh_lexer_token_entry_value value;
 
 #if defined(KH_TRACK_LINE_COLUMN)
-  int line;
-  int column;
+  kh_u32 line;
+  kh_u32 column;
 #endif
 
 } kh_lexer_token_entry;
