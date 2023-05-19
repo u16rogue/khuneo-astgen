@@ -11,6 +11,10 @@ add_library(
   STATIC
   "include/kh-astgen/lexer.h"
   "src/lexer.c"
+  "include/kh-astgen/parser.h"
+  "src/parser.c"
+  "include/kh-astgen/ast.h"
+  "src/ast.c"
 )
 
 set_target_properties(

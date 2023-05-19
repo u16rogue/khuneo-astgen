@@ -1,9 +1,12 @@
 #include <kh-astgen/lexer.h>
 #include <kh-core/utf8.h>
 
+// [18/05/2023] - TODO: decide whether we should have wrapper functions for interacting with the context rather than
+// doing `ctx>src[stuff]` for future proofing
+
 // ---------------------------------------------------------------------------------------------------- 
 
-// [30/04/202]TODO:sort by frequently used
+// [30/04/2023]TODO:sort by frequently used
 static const kh_utf8 tok_charsyms[] = {
   ';',
   '.',
@@ -35,26 +38,6 @@ static const kh_utf8 tok_stringcont[] = {
   '`',
   '"',
 };
-
-#if 0
-static const kh_utf8 * keywords[] = {
-  "def",
-  "as",
-  "import",
-  "export",
-  "if",
-  "else",
-  "iter",
-  "defer",
-  "break",
-  "continue",
-  "return",
-  "true",
-  "false",
-  "nil",
-  "undefined",
-};
-#endif
 
 // ---------------------------------------------------------------------------------------------------- 
 
@@ -104,23 +87,6 @@ static kh_bool is_valid_idtch(const kh_utf8 ch) {
          (ch == '$')          ||
          (ch == '_')            
          ;
-}
-
-// NOTE: need fix for short matches (src: "undefined" matches with "undef")
-static kh_bool src_strcmp(kh_lexer_context * ctx, kh_sz idx, const kh_utf8 * str) {
-  kh_u32 i = 0;
-  while (!is_src_end(ctx, i)) {
-    if (ctx->src[ctx->isrc + i] != *str)
-      break;
-
-    ++i;
-    ++str;
-
-    if (*str == '\0')
-      return 1;
-  }
-
-  return 0;
 }
 
 // ---------------------------------------------------------------------------------------------------- 
@@ -408,7 +374,7 @@ static kh_lex_resp lex_numbers(kh_lexer_context * ctx) {
   kh_f64 floating_offset = 0.0; // [30/04/2023] run benchmarks whether using a 0.0 check or a floating flag would be better
   kh_u64 value           = 0;
 
-  if (h_val == KH_U8_INVALID) { // Base 10 oarsing
+  if (h_val == KH_U8_INVALID) { // Base 10 parsing
     while (!is_src_end(ctx, 0)) {
       const kh_utf8 cc = ctx->src[ctx->isrc];
 
@@ -520,15 +486,11 @@ kh_bool kh_lexer_token_entry_next(kh_lexer_context * ctx, kh_lexer_token_entry *
   return 1;
 }
 
-kh_token_type kh_lexer_token_entry_type_get(kh_lexer_token_entry * c) {
+kh_token_type kh_lexer_token_entry_type_get(const kh_lexer_token_entry * c) {
   return c->type;
 }
 
-kh_lexer_token_entry_value * kh_lexer_token_value_get(kh_lexer_token_entry * c) {
-  return &c->value;
-}
-
-kh_u32 kh_lexer_token_entry_line_get(kh_lexer_token_entry * c) {
+kh_u32 kh_lexer_token_entry_line_get(const kh_lexer_token_entry * c) {
 #if defined(KH_TRACK_LINE_COLUMN)
   return c->line;
 #else
@@ -536,7 +498,7 @@ kh_u32 kh_lexer_token_entry_line_get(kh_lexer_token_entry * c) {
 #endif
 }
 
-kh_u32 kh_lexer_token_entry_column_get(kh_lexer_token_entry * c) {
+kh_u32 kh_lexer_token_entry_column_get(const kh_lexer_token_entry * c) {
 #if defined(KH_TRACK_LINE_COLUMN)
   return c->column;
 #else
@@ -546,6 +508,26 @@ kh_u32 kh_lexer_token_entry_column_get(kh_lexer_token_entry * c) {
 
 const kh_sz kh_lexer_token_entry_size() {
   return sizeof(kh_lexer_token_entry);
+}
+
+kh_u64  kh_lexer_token_entry_value_u64_get(const kh_lexer_token_entry * c) {
+  return c->value.u64;
+}
+
+kh_f64  kh_lexer_token_entry_value_f64_get(const kh_lexer_token_entry * c) {
+  return c->value.f64;
+}
+
+kh_utf8 kh_lexer_token_entry_value_charsym_get(const kh_lexer_token_entry * c) {
+  return c->value.charsym;
+}
+
+kh_u32 kh_lexer_token_entry_value_str_index_get(const kh_lexer_token_entry * c) {
+  return c->value.string.index;
+}
+
+kh_u32 kh_lexer_token_entry_value_str_sz_get(const kh_lexer_token_entry * c) {
+  return c->value.string.size;
 }
 
 #undef KH_HLP_ADD_COLUMN

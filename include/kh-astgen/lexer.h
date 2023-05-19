@@ -5,59 +5,11 @@
 typedef enum _kh_token_type {
   KH_TOK_INVALID,
   KH_TOK_IDENTIFIER,
-  // KH_TOK_KEYWORD,
   KH_TOK_STRING,
   KH_TOK_CHARSYM,
   KH_TOK_U64,
   KH_TOK_F64,
 } kh_token_type;
-
-// [13/05/2023] Removed keyword parsing and instead added as an identifier for the parser to process
-#if 0
-typedef enum _kh_keyword {
-  KH_KW_INVALID,
-  KH_KW_DEF,
-  KH_KW_AS,
-  KH_KW_IMPORT,
-  KH_KW_EXPORT,
-  KH_KW_IF,
-  KH_KW_ELSE,
-  KH_KW_ITER,
-  KH_KW_DEFER,
-  KH_KW_BREAK,
-  KH_KW_CONTINUE,
-  KH_KW_RETURN,
-  KH_KW_TRUE,
-  KH_KW_FALSE,
-  KH_KW_NIL,
-  KH_KW_UNDEFINED,
-} kh_keyword;
-#endif
-
-typedef union _kh_lexer_token_entry_value {
-  kh_utf8    charsym;
-  kh_u64     u64;
-  kh_f64     f64;
-
-  struct {
-    kh_u32 index;
-    kh_u32 size;
-  } string;
-
-  // kh_keyword keyword;
-} kh_lexer_token_entry_value;
-
-typedef struct _kh_lexer_token_entry {
-
-  kh_token_type              type;
-  kh_lexer_token_entry_value value;
-
-#if defined(KH_TRACK_LINE_COLUMN)
-  kh_u32 line;
-  kh_u32 column;
-#endif
-
-} kh_lexer_token_entry;
 
 typedef enum _kh_lexer_status {
   KH_LEXER_STATUS_OK,
@@ -69,8 +21,42 @@ typedef enum _kh_lexer_status {
   KH_LEXER_STATUS_INVALID_STRING_SYNTAX, // [17/04/2023] could really name this better
 } kh_lexer_status;
 
-typedef struct _kh_lexer_context {
+typedef enum _kh_lexer_response {
+  // Lexer finished parsing the tokens
+  KH_LEXER_RESPONSE_OK,
 
+  // Lexer failure (must abort)
+  KH_LEXER_RESPONSE_ERROR,
+
+  // Provided buffer in context has been exhausted, replace the buffer with a new one and call lexer again
+  // with the same context to continue. The memory reallocation is left to the caller. You can either create a new buffer
+  // or realloc the same memory then just set token_buffer at the start of the extended memory and setting token_buffer_size
+  // to the extended memory size keeping the entire memory block contiguous
+  KH_LEXER_RESPONSE_BUFFER_EXHAUSTED, 
+} kh_lexer_response;
+
+typedef union _kh_lexer_token_entry_value {
+  kh_utf8    charsym;
+  kh_u64     u64;
+  kh_f64     f64;
+
+  struct {
+    kh_u32 index;
+    kh_u32 size;
+  } string;
+} kh_lexer_token_entry_value;
+
+typedef struct _kh_lexer_token_entry {
+  kh_token_type              type;
+  kh_lexer_token_entry_value value;
+
+#if defined(KH_TRACK_LINE_COLUMN)
+  kh_u32 line;
+  kh_u32 column;
+#endif
+} kh_lexer_token_entry;
+
+typedef struct _kh_lexer_context {
   kh_lexer_status status;
 
   kh_lexer_token_entry * token_buffer;      // Pointer to a buffer
@@ -85,23 +71,7 @@ typedef struct _kh_lexer_context {
   kh_u32 line;
   kh_u32 column;
 #endif
-
 } kh_lexer_context;
-
-typedef enum _kh_lexer_response {
-  // Lexer finished parsing the tokens
-  KH_LEXER_RESPONSE_OK,
-
-  // Lexer failure (must abort)
-  KH_LEXER_RESPONSE_ERROR,
-
-  // Provided buffer in context has been exhausted, replace the buffer with a new one and call lexer again
-  // with the same context to continue. The memory reallocation is left to the caller. You can either create a new buffer
-  // or realloc the same memory then just set token_buffer at the start of the extended memory and setting token_buffer_size
-  // to the extended memory size keeping the entire memory block contiguous
-  KH_LEXER_RESPONSE_BUFFER_EXHAUSTED, 
-
-} kh_lexer_response;
 
 /*
  *  Runs the lexer with a given context.
@@ -125,28 +95,36 @@ kh_bool kh_lexer_token_entry_next(kh_lexer_context * ctx, kh_lexer_token_entry *
 /*
  *  Obtains the type field of a token entry
  */
-kh_token_type kh_lexer_token_entry_type_get(kh_lexer_token_entry * c);
-
-/*
- *  Obtains the value field of a token entry
- */
-kh_lexer_token_entry_value * kh_lexer_token_value_get(kh_lexer_token_entry * c);
+kh_token_type kh_lexer_token_entry_type_get(const kh_lexer_token_entry * c);
 
 /*
  *  Obtains the line field of a token entry. Returns 0
  *  if `Line` is not being tracked.
  *  (As it should be impossible to have line 0)
  */
-kh_u32 kh_lexer_token_entry_line_get(kh_lexer_token_entry * c);
+kh_u32 kh_lexer_token_entry_line_get(const kh_lexer_token_entry * c);
 
 /*
  *  Obtains the column field of a token entry. Returns 0
  *  if `Line` is not being tracked
  *  (As it should be impossible to have line 0)
  */
-kh_u32 kh_lexer_token_entry_column_get(kh_lexer_token_entry * c);
+kh_u32 kh_lexer_token_entry_column_get(const kh_lexer_token_entry * c);
 
 /*
  *  Reports the size of the structure `kh_lexer_token_entry`
  */
 const kh_sz kh_lexer_token_entry_size();
+
+/*
+ *  Obtains the value of a token entry
+ */
+kh_u64  kh_lexer_token_entry_value_u64_get(const kh_lexer_token_entry * c);
+kh_f64  kh_lexer_token_entry_value_f64_get(const kh_lexer_token_entry * c);
+kh_utf8 kh_lexer_token_entry_value_charsym_get(const kh_lexer_token_entry * c);
+
+/*
+ *  Obtains the value field of string type token entry
+ */
+kh_u32 kh_lexer_token_entry_value_str_index_get(const kh_lexer_token_entry * c); 
+kh_u32 kh_lexer_token_entry_value_str_sz_get(const kh_lexer_token_entry * c);
